@@ -1,4 +1,5 @@
 ## Organizador de ROMs de 3DS: Todo en un Clic
+<img width="1288" height="772" alt="image" src="https://github.com/user-attachments/assets/97f69372-d896-4795-a8c1-1b44ea12571f" />
 
 ¿Cansado de tener una carpeta de juegos de 3DS desordenada, llena de archivos `.zip`, `.rar`, `.7z` y con formatos confusos como `.3ds` o `.cia`? Esta aplicación es tu solución.
 
@@ -67,4 +68,4 @@ Aquí te explicamos cómo hacerlo desde el repositorio oficial:
 * Ahí estará tu archivo `.zip` (ej. `ROM-Renamer-Windows-EXE.zip`).
 * Haz clic en él para **descargarlo**.
 
-¡Felicidades! Ese archivo `.zip` contiene el `.exe` que fue compilado por los servidores seguros de GitHub directamente desde el código fuente (`main.py`). Es la forma más segura de obtener la aplicación.
+Ese archivo `.zip` contiene el `.exe` que fue compilado por los servidores seguros de GitHub directamente desde el código fuente (`main.py`). Es la forma más segura de obtener la aplicación.
