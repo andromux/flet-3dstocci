@@ -31,7 +31,7 @@ En resumen: **transforma tu carpeta de juegos desordenada en una biblioteca limp
 
 Usar la aplicación es increíblemente sencillo:
 
-1.  **Ejecuta el archivo** `ROM_Renamer_3DS.exe`.
+1.  Descarga el programa desde: [Releases](https://github.com/andromux/flet-3dstocci/releases/tag/1.0) **Ejecuta el archivo** `ROM_Renamer_3DS.exe`.
     * *Nota de Seguridad:* Como es una app no firmada, es posible que Windows muestre una advertencia de "SmartScreen". Solo tienes que hacer clic en "Más información" y luego en "Ejecutar de todos modos".
 2.  **Selecciona tu Carpeta:** Haz clic en el botón **"Seleccionar Carpeta"**.
 3.  **Elige:** Busca y acepta la carpeta donde tienes todos tus juegos de 3DS desordenados.
