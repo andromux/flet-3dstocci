@@ -4,11 +4,6 @@ name: 📦 Compilar EXE para Windows
 
 # Disparadores:
 on:
-  # 1. Ejecutar en cada push a la rama 'main'
-  push:
-    branches:
-      - main
-  # 2. Permitir ejecutarlo manualmente desde la pestaña "Actions"
   workflow_dispatch:
 
 jobs:
