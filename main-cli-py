@@ -1,0 +1,256 @@
+#!/usr/bin/env python3
+"""
+ROM Renamer para Nintendo 3DS
+Renombra automáticamente ROMs a formato .cci y extrae archivos comprimidos
+"""
+
+import os
+import shutil
+import zipfile
+import py7zr
+import rarfile
+from pathlib import Path
+from typing import List, Set
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Confirm, Prompt
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+from rich.table import Table
+from rich import box
+from rich.text import Text
+
+console = Console()
+
+# Extensiones de ROMs de Nintendo 3DS
+ROM_EXTENSIONS = {'.3ds', '.cia', '.3dsx', '.app'}
+
+# Extensiones de archivos comprimidos
+COMPRESSED_EXTENSIONS = {'.zip', '.rar', '.7z', '.tar', '.gz', '.bz2'}
+
+# Extensión objetivo
+TARGET_EXTENSION = '.cci'
+
+
+class ROMRenamer:
+    def __init__(self, directory: str = '.'):
+        self.directory = Path(directory).resolve()
+        self.backup_dir = self.directory / 'archivos_comprimidos_backup'
+        self.stats = {
+            'renamed': 0,
+            'extracted': 0,
+            'moved': 0,
+            'errors': 0
+        }
+    
+    def create_backup_dir(self):
+        """Crea el directorio de respaldo si no existe"""
+        if not self.backup_dir.exists():
+            self.backup_dir.mkdir(parents=True)
+            console.print(f"[green]✓[/green] Carpeta de respaldo creada: {self.backup_dir.name}")
+    
+    def find_files(self) -> tuple[List[Path], List[Path]]:
+        """Encuentra archivos ROM y comprimidos en el directorio"""
+        rom_files = []
+        compressed_files = []
+        
+        for file in self.directory.iterdir():
+            if file.is_file():
+                ext = file.suffix.lower()
+                if ext in ROM_EXTENSIONS:
+                    rom_files.append(file)
+                elif ext in COMPRESSED_EXTENSIONS:
+                    compressed_files.append(file)
+        
+        return rom_files, compressed_files
+    
+    def rename_rom(self, file: Path) -> bool:
+        """Renombra un archivo ROM a .cci"""
+        try:
+            new_name = file.with_suffix(TARGET_EXTENSION)
+            if new_name.exists():
+                console.print(f"[yellow]⚠[/yellow] Ya existe: {new_name.name}")
+                return False
+            
+            file.rename(new_name)
+            console.print(f"[green]✓[/green] Renombrado: {file.name} → {new_name.name}")
+            self.stats['renamed'] += 1
+            return True
+        except Exception as e:
+            console.print(f"[red]✗[/red] Error al renombrar {file.name}: {e}")
+            self.stats['errors'] += 1
+            return False
+    
+    def extract_archive(self, archive: Path) -> List[Path]:
+        """Extrae un archivo comprimido y retorna las ROMs encontradas"""
+        extract_dir = self.directory / f"_temp_extract_{archive.stem}"
+        rom_files = []
+        
+        try:
+            # Crear directorio temporal de extracción
+            extract_dir.mkdir(exist_ok=True)
+            
+            # Extraer según el tipo
+            ext = archive.suffix.lower()
+            if ext == '.zip':
+                with zipfile.ZipFile(archive, 'r') as zip_ref:
+                    zip_ref.extractall(extract_dir)
+            elif ext == '.7z':
+                with py7zr.SevenZipFile(archive, 'r') as sz_ref:
+                    sz_ref.extractall(extract_dir)
+            elif ext == '.rar':
+                with rarfile.RarFile(archive, 'r') as rar_ref:
+                    rar_ref.extractall(extract_dir)
+            else:
+                console.print(f"[yellow]⚠[/yellow] Formato no soportado: {ext}")
+                return rom_files
+            
+            console.print(f"[green]✓[/green] Extraído: {archive.name}")
+            self.stats['extracted'] += 1
+            
+            # Buscar ROMs en el directorio extraído (recursivamente)
+            for root, dirs, files in os.walk(extract_dir):
+                for file in files:
+                    file_path = Path(root) / file
+                    if file_path.suffix.lower() in ROM_EXTENSIONS:
+                        # Mover ROM al directorio principal
+                        dest = self.directory / file_path.name
+                        counter = 1
+                        while dest.exists():
+                            dest = self.directory / f"{file_path.stem}_{counter}{file_path.suffix}"
+                            counter += 1
+                        
+                        shutil.move(str(file_path), str(dest))
+                        rom_files.append(dest)
+                        console.print(f"[cyan]→[/cyan] ROM encontrada: {dest.name}")
+            
+            # Limpiar directorio temporal
+            shutil.rmtree(extract_dir, ignore_errors=True)
+            
+        except Exception as e:
+            console.print(f"[red]✗[/red] Error al extraer {archive.name}: {e}")
+            self.stats['errors'] += 1
+            # Limpiar en caso de error
+            if extract_dir.exists():
+                shutil.rmtree(extract_dir, ignore_errors=True)
+        
+        return rom_files
+    
+    def move_to_backup(self, file: Path) -> bool:
+        """Mueve un archivo a la carpeta de respaldo"""
+        try:
+            dest = self.backup_dir / file.name
+            counter = 1
+            while dest.exists():
+                dest = self.backup_dir / f"{file.stem}_{counter}{file.suffix}"
+                counter += 1
+            
+            shutil.move(str(file), str(dest))
+            console.print(f"[blue]→[/blue] Movido a respaldo: {file.name}")
+            self.stats['moved'] += 1
+            return True
+        except Exception as e:
+            console.print(f"[red]✗[/red] Error al mover {file.name}: {e}")
+            self.stats['errors'] += 1
+            return False
+    
+    def show_stats(self):
+        """Muestra las estadísticas finales"""
+        table = Table(title="Resumen de Operaciones", box=box.ROUNDED)
+        table.add_column("Operación", style="cyan", justify="left")
+        table.add_column("Cantidad", style="magenta", justify="center")
+        
+        table.add_row("ROMs renombradas", str(self.stats['renamed']))
+        table.add_row("Archivos extraídos", str(self.stats['extracted']))
+        table.add_row("Archivos respaldados", str(self.stats['moved']))
+        table.add_row("Errores", str(self.stats['errors']), style="red" if self.stats['errors'] > 0 else "green")
+        
+        console.print("\n")
+        console.print(table)
+    
+    def run(self):
+        """Ejecuta el proceso completo"""
+        # Mostrar banner
+        banner = Text()
+        banner.append("╔═══════════════════════════════════════╗\n", style="bold cyan")
+        banner.append("║   ", style="bold cyan")
+        banner.append("ROM RENAMER - Nintendo 3DS", style="bold white")
+        banner.append("   ║\n", style="bold cyan")
+        banner.append("║   ", style="bold cyan")
+        banner.append("Convierte ROMs a formato .cci", style="italic")
+        banner.append("    ║\n", style="bold cyan")
+        banner.append("╚═══════════════════════════════════════╝", style="bold cyan")
+        console.print(banner)
+        console.print(f"\n[bold]Directorio de trabajo:[/bold] {self.directory}\n")
+        
+        # Buscar archivos
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task("[cyan]Escaneando directorio...", total=None)
+            rom_files, compressed_files = self.find_files()
+            progress.update(task, completed=True)
+        
+        # Mostrar resumen
+        console.print(f"\n[bold green]→[/bold green] ROMs encontradas: {len(rom_files)}")
+        console.print(f"[bold blue]→[/bold blue] Archivos comprimidos: {len(compressed_files)}\n")
+        
+        if not rom_files and not compressed_files:
+            console.print("[yellow]No se encontraron archivos para procesar.[/yellow]")
+            return
+        
+        # Confirmar operación
+        if not Confirm.ask("¿Deseas continuar con el proceso?", default=True):
+            console.print("[yellow]Operación cancelada.[/yellow]")
+            return
+        
+        console.print("\n[bold cyan]Iniciando proceso...[/bold cyan]\n")
+        
+        # Crear directorio de respaldo
+        if compressed_files:
+            self.create_backup_dir()
+        
+        # Procesar archivos comprimidos primero
+        if compressed_files:
+            console.print(f"\n[bold]Paso 1/3:[/bold] Extrayendo archivos comprimidos\n")
+            extracted_roms = []
+            for archive in compressed_files:
+                roms = self.extract_archive(archive)
+                extracted_roms.extend(roms)
+            
+            # Agregar ROMs extraídas a la lista
+            rom_files.extend(extracted_roms)
+        
+        # Renombrar ROMs
+        if rom_files:
+            console.print(f"\n[bold]Paso 2/3:[/bold] Renombrando ROMs a .cci\n")
+            for rom in rom_files:
+                if rom.exists() and rom.suffix.lower() != TARGET_EXTENSION:
+                    self.rename_rom(rom)
+        
+        # Mover archivos comprimidos a respaldo
+        if compressed_files:
+            console.print(f"\n[bold]Paso 3/3:[/bold] Moviendo archivos comprimidos a respaldo\n")
+            for archive in compressed_files:
+                if archive.exists():
+                    self.move_to_backup(archive)
+        
+        # Mostrar estadísticas
+        self.show_stats()
+        
+        console.print("\n[bold green]✓ Proceso completado exitosamente![/bold green]\n")
+
+
+def main():
+    try:
+        renamer = ROMRenamer()
+        renamer.run()
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Operación cancelada por el usuario.[/yellow]")
+    except Exception as e:
+        console.print(f"\n[red]Error crítico: {e}[/red]")
+
+
+if __name__ == "__main__":
+    main()
