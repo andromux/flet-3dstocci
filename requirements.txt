@@ -1,0 +1,5 @@
+# requirements.txt
+flet[All]
+py7zr
+rarfile
+pyinstaller
