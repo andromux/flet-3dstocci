@@ -1,0 +1,53 @@
+# .github/workflows/build-windows.yml
+
+name: 📦 Compilar EXE para Windows
+
+# Disparadores:
+on:
+  # 1. Ejecutar en cada push a la rama 'main'
+  push:
+    branches:
+      - main
+  # 2. Permitir ejecutarlo manualmente desde la pestaña "Actions"
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    # Usar la última versión de Windows Server disponible
+    runs-on: windows-latest
+
+    steps:
+      # 1. Descargar el código del repositorio
+      - name: ⬇️ Checkout (Descargar código)
+        uses: actions/checkout@v4
+
+      # 2. Configurar el entorno de Python
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # Puedes usar '3.10', '3.11', '3.12', etc.
+
+      # 3. Instalar las dependencias de Python
+      - name: ⚙️ Instalar dependencias
+        run: |
+          pip install -r requirements.txt
+
+      # 4. Compilar la aplicación con PyInstaller
+      - name: 🏗️ Compilar con PyInstaller
+        run: |
+          pyinstaller --onefile --windowed --name="ROM_Renamer_3DS" main.py
+        # --- ¡IMPORTANTE! ---
+        # --onefile: Crea un solo ejecutable.
+        # --windowed: ¡CRÍTICO para Flet! Evita que se abra una consola negra detrás de tu GUI.
+        # --name="ROM_Renamer_3DS": El nombre que tendrá tu .exe final.
+        # renamer_app.py: Cambia esto por el nombre real de tu script.
+
+      # 5. Subir el .exe como un artefacto
+      - name: 🚀 Subir artefacto (el .exe)
+        uses: actions/upload-artifact@v4
+        with:
+          # Nombre del archivo .zip que podrás descargar
+          name: ROM-Renamer-Windows-EXE
+          # Ruta al archivo que PyInstaller genera.
+          # PyInstaller siempre lo deja en la carpeta 'dist'.
+          path: dist/ROM_Renamer_3DS.exe
